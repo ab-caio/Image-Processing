@@ -1,0 +1,29 @@
+body        {
+    background-color:rgb(20, 20, 20);
+    color:#cccccc;
+}
+
+h1          {
+    text-decoration: underline;
+}
+
+#tools      {
+    display: flex;
+    background-color: #101010;
+    align-items: center;
+    width: 100vw;
+    height: 70px;
+    gap: 10px;
+}
+
+#image         {
+    background-color: #303030;
+    display: flex;
+    align-content: center;
+    justify-content: center;
+}
+
+
+#options      {
+    gap: 10px;
+}
