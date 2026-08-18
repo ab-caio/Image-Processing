@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <title>_Image_</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <h1>Currently testing</h1>
+
+    <div id="tools">
+        <button class="tool" id="save">Save</button>
+        <button class="tool" id="undo">Undo</button>
+        <button class="tool" id="redo">Redo</button>
+        <input class="tool" id="input" type="file" name="Escolha uma imagem" type="image"><br><br>
+    </div>
+    
+
+    <div id="image">
+        <img id="output" alt="processing..." style="display: none; width: 400px;" src="">
+    </div>
+
+    <br><hr style="display: block"><br>
+
+    <div id="options" style="display: none">
+        <button id="inverse" type="button">Negative</button><br>
+        <button id="thresholdToggle">Threshold</button>
+        <input id="threshold" type="range" min="0" max="100" value="50" style="display: none"><br>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/jimp@0.22.12/browser/lib/jimp.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
