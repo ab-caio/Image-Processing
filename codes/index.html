@@ -5,24 +5,25 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 
+
 <body>
     <h1>Currently testing</h1>
+    <hr>
 
-    <div id="tools">
-        <button class="tool" id="save">Save</button>
-        <button class="tool" id="undo">Undo</button>
-        <button class="tool" id="redo">Redo</button>
-        <input class="tool" id="input" type="file" name="Escolha uma imagem" type="image"><br><br>
+    <div id="utils">
+        <button class="button" id="save">Save</button>
+        <button class="button" id="undo">Undo</button>
+        <button class="button" id="redo">Redo</button>
+        <button class="button" id="showOg">Show original image</button>
     </div>
-    
 
     <div id="image">
-        <img id="output" alt="processing..." style="display: none; width: 400px;" src="">
+        <img id="output" alt="processing..." style="display: none; width: 400px;" src=""><br><br>
     </div>
 
-    <br><hr style="display: block"><br>
+    <input class="button" id="input" type="file" name="Escolha uma imagem" type="image"><br><br>
 
-    <div id="options" style="display: none">
+    <div id="options">
         <button id="inverse" type="button">Negative</button><br>
         <button id="thresholdToggle">Threshold</button>
         <input id="threshold" type="range" min="0" max="100" value="50" style="display: none"><br>
