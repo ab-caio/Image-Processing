@@ -2,24 +2,25 @@
 // Global scope variables
 
 const file = document.getElementById("input");
+const preview = document.getElementById("output");
+const saveBtn = document.getElementById("save");
 const undoBtn = document.getElementById("undo");
 const redoBtn = document.getElementById("redo");
-const saveBtn = document.getElementById("save");
-const preview = document.getElementById("output"); 
-const optionsDiv = document.getElementById("options");
+const showOgBtn = document.getElementById("showOg");
+const optionsDiv = document.querySelector("#options");
 const inverseBtn = document.getElementById("inverse");
 const rangeThreshold = document.getElementById("threshold");
 const thresholdToggle = document.getElementById("thresholdToggle");
 const maxHistory = 5;
 
-let valueThreshold = null;
 let originalImg = null;
 let currentImg = null;
 let previewImg = null;
 let inverted = false;
-let historyIdx = null;
-let undoTimes = 1;
+let valueThreshold = null;
 let history = [];
+let undoTimes = 0;
+let currentIdx = 0;
 
 
 
@@ -28,44 +29,86 @@ let history = [];
 // History array that stores the last 5 editions made
 
 function push_toHistory(imgInstance) {
-    const _cloned = imgInstance.clone();
-    history.push(_cloned);
+    _clone = imgInstance.clone();
+    history.push(_clone);
 
-    if (history.length > maxHistory) {
+    if (history.lenght > maxHistory) {
         history.shift();
     }
 }
 
-saveBtn.addEventListener("click", function() {
-    push_toHistory(previewImg);
+
+// -------------------------------------------------------------- #
+// Shows the original image temporarily
+
+
+showOgBtn.addEventListener("mousedown", async function() {
+    await displayImg(originalImg);
 });
 
-// --------------------------------------------------------------- #
-// Undo edits
+showOgBtn.addEventListener("mouseup", async function() {
+    await displayImg(previewImg);
+});
+
+
+// -------------------------------------------------------------- #
+// Undo image edits function.
+
 
 function undo() {
-    historyIdx = history.length - 1 - undoTimes;
-    if (historyIdx >= 0) {
-        displayImg(history[history.Idx]);
-        ++undoTimes;
-    } else {
-        historyIdx = 0;
-        displayImg(history[historyIdx]);
+
+    if (undoTicks < 5) {
+    currentIdx = history.length - 1 - undoTimes;
+    previewImg = history[currentIdx];
+    undoTicks++
+    } else if () {
+        previewImg = history[0];
     }
 }
 
-undoBtn.addEventListener("click", function() {
-    undo();
+undoBtn.addEventListener("click", async function() {
+    await displayImg(previewImg);
+    undoTimes++;
+    if (undoTimes > 5) {
+        undoTimes = 5;
+    }
 });
 
 
+// -------------------------------------------------------------- #
+// Redo image edits function.
 
-// --------------------------------------------------------------- #
-// Redo edits
 
 function redo() {
-    displayImg(history[historyIdx+1]);
+    if (undoTimes <= 0) {
+        undoTimes = 0;
+        redoBtn.style.opacity = "50%";
+    } else if (undoTimes < history.length - 1) {
+       previewImg = history[currentIdx + 1];
+        undoTimes -= 1;
+    }
 }
+
+
+// -------------------------------------------------------------- #
+// Save image function. Enables filter stacking
+
+async function save(Image) {
+    if (!Image) return;
+
+    push_toHistory(Image);
+    await displayImg(Image);
+    currentImg = previewImg;
+}
+
+saveBtn.addEventListener("click", function() {
+    try {
+        save(previewImg);
+        console.log("Image saved succesfully");
+    } catch (err) {
+        console.error("Error during image saving: ", err);
+    }
+});
 
 // --------------------------------------------------------------- #
 // Picks image from the <input id="input" type="file" ...> in the document
@@ -79,14 +122,12 @@ try {
     originalImg = await Jimp.read(array);
     currentImg = originalImg.clone();
     console.log("Image loaded succesfully");
-    push_toHistory(currentImg);
 
     await displayImg(currentImg);
     optionsDiv.style.display = "flex";
-    document.getElementsByTagName("hr").style.display = "block";
 
 } catch (err) {
-    console.error("Error during image loading:", err);
+    console.error("Error during iamge loading:", err);
 }
 });
 
@@ -99,10 +140,10 @@ async function displayImg(jimpImage) {
         const base64 = await jimpImage.getBase64Async(Jimp.MIME_PNG);
         preview.src = base64;
         preview.style.display = "block";
-        console.log("Image displayed succesfully");
+        console.log("Image displayed succesfully: ", currentImg);
 
     } catch (err) {
-        console.log("Error during image display:\n<<<  ", err, "  >>");
+        console.error("Error during image display:\n<<<  ", err, "  >>");
     }
 }
 
@@ -125,21 +166,20 @@ inverseBtn.addEventListener("click", async () => {
     if (!originalImg) return;
 
     if (!inverted) {
-        applyNegative(currentImg);
-        push_toHistory(currentImg);
-        inverseBtn.innerHTML = "Restaurar";
+        previewImg = currentImg.clone();
+        applyNegative(previewImg);
+        inverseBtn.innerHTML = "Go back";
         inverted = true;
 
     } else {
-        push_toHistory(currentImg);
-        inverseBtn.innerHTML = "Negativo";
-        applyNegative(currentImg);
-        push_toHistory(currentImg);
+        previewImg = currentImg.clone();
+        inverseBtn.innerHTML = "Negative";
         inverted = false;
     }
-    await displayImg(currentImg);
-    console.log("Image negated succesfully");
+    await displayImg(previewImg);
+    console.log("Image negated succesfully")
 });
+
 
 
 
@@ -173,37 +213,35 @@ async function applyThreshold(jimpImage, thresholdRange) {
 }
 
 
-{
-    let thresImg = currentImg.clone();
-    valueThreshold = (rangeThreshold.value / 100) * 255;
+// --------------------------------------------------------------- #
+// Threshold range input toggle
 
-    // --------------------------------------------------------------- #
-    // Threshold range input toggle
+thresholdToggle.addEventListener("click", function() {
+    previewImg = currentImg.clone()
 
-    thresholdToggle.addEventListener("click", async function() {
-        if (rangeThreshold.style.display == "none") {
-            rangeThreshold.style.display = "block";
+    if (rangeThreshold.style.display == "none") {
+        rangeThreshold.style.display = "block";
+        applyThreshold(previewImg, rangeThreshold.value);
+        displayImg(previewImg);
+    } else {
+        rangeThreshold.style.display = "none";
+        previewImg = currentImg;
+        displayImg(previewImg);
+    }
+});
 
-            await applyThreshold(thresImg, valueThreshold);
-            push_toHistory(thresImg);
-            await displayImg(thresImg);
 
-        } else {
-            rangeThreshold.style.display = "none";
-        }
-    });
+// --------------------------------------------------------------- #
+// Threshold range input
 
-    // --------------------------------------------------------------- #
-    // Threshold input range
+rangeThreshold.addEventListener("change", async function() {
+    if (!currentImg) return;
 
-    rangeThreshold.addEventListener("change", async function() {
-        if (!originalImg) return;
+    previewImgThre = currentImg.clone();
+    let valueThreshold = (rangeThreshold.value / 100) * 255;
+    await applyThreshold(previewImgThre, valueThreshold);
 
-        let valueThreshold = (rangeThreshold.value / 100) * 255;
-        await applyThreshold(thresImg, valueThreshold);
+    await displayImg(previewImgThre);
+    console.log("Image thresholded succesfully to", valueThreshold);
 
-        await displayImg(thresImg);
-        console.log("Image thresholded succesfully to", valueThreshold);
-
-    });
-}
+});
