@@ -61,7 +61,7 @@ function undo() {
     currentIdx = history.length - 1 - undoTimes;
     previewImg = history[currentIdx];
     undoTicks++
-    } else if () {
+    } else if (false) {
         previewImg = history[0];
     }
 }
