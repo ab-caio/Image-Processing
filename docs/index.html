@@ -1,35 +1,79 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <title>Image Enhancement</title>
-    <link rel="stylesheet" href="styles.css">
+<meta charset="UTF-8">
+<title>Escurecer — editor de imagem</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<!-- ======================================================================================================= -->
+<!-- Biblioteca Jimp (edita imagens em JavaScript, sem precisar de canvas ou de um servidor)                 -->
+<!-- ======================================================================================================= -->
+<script src="https://cdn.jsdelivr.net/npm/jimp@0.22.12/browser/lib/jimp.js"></script>
+
+<!-- Estilo visual da página (cores, layout, janelas flutuantes etc.) -->
+<link rel="stylesheet" href="estilo.css">
 </head>
-
-
 <body>
-    <h1>Currently testing</h1>
-    <hr>
 
-    <div id="utils">
-        <button class="button" id="save">Save</button>
-        <button class="button" id="undo">Undo</button>
-        <button class="button" id="redo">Redo</button>
-        <button class="button" id="showOg">Show original image</button>
-    </div>
+<!-- =========================================================================================================== -->
+<!-- Barra do topo: título, botão de abrir arquivo e botão de salvar                                            -->
+<!-- =========================================================================================================== -->
 
-    <div id="image">
-        <img id="output" alt="processing..." style="display: none; width: 400px;" src=""><br><br>
-    </div>
+<header>
+  <h1>Escurecer<span>.</span></h1>
+  <div class="top-actions">
+    <label class="file-btn" for="file-input">Abrir imagem</label>
+    <input type="file" id="file-input" accept="image/*">
+    <button class="action-btn" id="save-btn" disabled>Salvar</button>
+  </div>
+</header>
 
-    <input class="button" id="input" type="file" name="Escolha uma imagem" type="image"><br><br>
+<!-- =========================================================================================================== -->
+<!-- Painel esquerdo: ferramentas (ainda não implementadas, apenas espaço reservado)                            -->
+<!-- =========================================================================================================== -->
 
-    <div id="options">
-        <button id="inverse" type="button">Negative</button><br>
-        <button id="thresholdToggle">Threshold</button>
-        <input id="threshold" type="range" min="0" max="100" value="50" style="display: none"><br>
-    </div>
+<aside id="tools">
+  <div class="panel-title">FERRAMENTAS</div>
+  <div class="tool-item"><span class="glyph">⬚</span> Cortar <span class="soon">em breve</span></div>
+  <div class="tool-item"><span class="glyph">◇</span> Selecionar <span class="soon">em breve</span></div>
+  <div class="tool-item"><span class="glyph">✎</span> Desenhar <span class="soon">em breve</span></div>
+</aside>
 
-    <script src="https://cdn.jsdelivr.net/npm/jimp@0.22.12/browser/lib/jimp.js"></script>
-    <script src="script.js"></script>
+<!-- =========================================================================================================== -->
+<!-- Área central: a imagem carregada aparece aqui, centralizada                                                -->
+<!-- =========================================================================================================== -->
+
+<section id="canvas-area">
+  <div id="empty-state">
+    <div class="big">Nenhuma imagem carregada</div>
+    Abra um arquivo para começar
+  </div>
+  <div id="stage">
+    <img id="main-image" alt="imagem carregada">
+  </div>
+</section>
+
+<!-- =========================================================================================================== -->
+<!-- Painel direito: lista de filtros disponíveis e lista de camadas já aplicadas                               -->
+<!-- =========================================================================================================== -->
+
+<aside id="filters">
+  <div class="panel-title">FILTROS</div>
+  <button class="filter-btn" id="btn-negativo" disabled>Negativo</button>
+  <button class="filter-btn" id="btn-limiar" disabled>Limiarização</button>
+  <button class="filter-btn" disabled>Escala de cinza <span class="tag">em breve</span></button>
+  <button class="filter-btn" disabled>Desfoque <span class="tag">em breve</span></button>
+  <button class="filter-btn" disabled>Contraste <span class="tag">em breve</span></button>
+
+  <div class="section-gap"></div>
+
+  <div class="panel-title">CAMADAS</div>
+  <div id="layers-list">
+    <div class="layers-empty">Nenhum filtro aplicado</div>
+  </div>
+</aside>
+
+<!-- Lógica do editor (abrir, aplicar filtros, camadas, salvar) -->
+<script src="script.js"></script>
 </body>
 </html>
