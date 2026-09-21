@@ -1,426 +1,437 @@
-/* ========================================================================================================= */
-/* Variáveis de cor                                                                                          */
-/* ========================================================================================================= */
 
-:root {
-  --bg: #0a0a0a;             /* fundo geral da página */
-  --panel: #141414;          /* fundo dos painéis (topo, laterais) */
-  --panel-border: #262626;   /* borda usada em botões e caixas */
-  --line: #232323;           /* linhas divisórias finas */
-  --text: #e8e6e2;           /* cor principal do texto */
-  --text-dim: #8a8a86;       /* texto secundário, mais apagado */
-  --accent: #d4b483;         /* cor de destaque (dourado) */
-  --accent-dim: #6b5a3f;     /* versão escurecida do destaque */
-  --danger: #b5544a;         /* cor de aviso/perigo (botão remover) */
+:root   {
+    --bg: #0a0a0a;
+    --panel: #080808;
+    --box-border: #282828;
+    --line: #202020;
+    --text: #e8e8e8;
+    --text-dim: #8a8a86;
+    --highlight: #8b06e9;
+    --wip: #313131;
+    --danger: #b5544a;
 }
 
-/* ========================================================================================================= */
-/* Estrutura geral da página                                                                                 */
-/* ========================================================================================================= */
-
-* {
-  box-sizing: border-box;
+*   {
+    box-sizing: border-box;
 }
 
-html, body {
-  margin: 0;
-  height: 100%;
-  background: var(--bg);
-  color: var(--text);
-  font-family: "Georgia", "Iowan Old Style", serif;
-  overflow: hidden;
+html, body  {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: helvetica, "Times New Roman";
+    overflow: hidden;
 }
 
-/* A página é dividida em 4 áreas fixas: topo, ferramentas, imagem e filtros. */
-body {
-  display: grid;
-  grid-template-columns: 220px 1fr 240px;
-  grid-template-rows: 56px 1fr;
-  grid-template-areas:
+body    {
+    display: grid;
+    grid-template-columns: 160px 1fr 260px;
+    grid-template-rows: 56px 1fr;
+    grid-template-areas: 
     "top top top"
     "left canvas right";
-  height: 100vh;
+    height: 100vh;
 }
 
-/* ========================================================================================================= */
-/* Barra do topo (título e botões de abrir/salvar)                                                          */
-/* ========================================================================================================= */
 
-header {
-  grid-area: top;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 20px;
-  border-bottom: 1px solid var(--line);
-  background: var(--panel);
+
+
+
+/* ================================================== */
+/* Barra superior                                     */
+/* ================================================== */
+
+header  {
+    grid-area: top;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    border-bottom: 1px solid var(--line);
+    background: var(--panel);
 }
 
-header h1 {
-  font-size: 15px;
-  font-weight: 400;
-  letter-spacing: 0.04em;
-  margin: 0;
-  color: var(--text);
+header h1   {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 500;
+    letter-spacing: 0.05em;
 }
 
-header h1 span {
-  color: var(--accent);
+#top-area   {
+    gap: 10px;
+    display: flex;
+    align-items: center;
 }
 
-.top-actions {
-  display: flex;
-  gap: 10px;
-  align-items: center;
+label.file-btn, button.action-btn  {
+    font-family: inherit;
+    font-size: 12px;
+    color: var(--text);
+    background: transparent;
+    border: 1px solid var(--box-border);
+    padding: 7px 14px;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    transition: border-color 0.15s ease, color 0.15s ease;
 }
 
-/* O botão "Abrir imagem" é, na verdade, um <label> disfarçado, pois aponta
-   para o <input type="file"> escondido logo abaixo. */
-label.file-btn, button.action-btn {
-  font-family: inherit;
-  font-size: 12.5px;
-  color: var(--text);
-  background: transparent;
-  border: 1px solid var(--panel-border);
-  padding: 7px 14px;
-  cursor: pointer;
-  letter-spacing: 0.02em;
-  transition: border-color 0.15s ease, color 0.15s ease;
+label.file-btn:hover, button.action-btn:hover   {
+    color: var(--highlight);
+    border-color: var(--highlight);
 }
 
-label.file-btn:hover, button.action-btn:hover {
-  border-color: var(--accent-dim);
-  color: var(--accent);
+button.action-btn:disabled  {
+    opacity: 0.35;
+    cursor: default;
 }
 
-button.action-btn:disabled {
-  opacity: 0.35;
-  cursor: default;
+button.action-btn:disabled:hover    {
+    border-color: var(--box-border);
+    color: var(--text);
 }
 
-button.action-btn:disabled:hover {
-  border-color: var(--panel-border);
-  color: var(--text);
+input[type="file"]  {
+    display: none;
 }
 
-input[type="file"] {
-  display: none;
+
+
+
+
+/* ==================================================== */
+/* Barra lateral de ferramentas à esquerda              */
+/* =====================================================*/
+
+#tools  {
+    grid-area: left;
+    border-right: 1px solid var(--line);
+    background: var(--panel);
+    padding: 18px 20px;
+    overflow-y: auto;
 }
 
-/* ========================================================================================================= */
-/* Painel esquerdo: ferramentas                                                                              */
-/* ========================================================================================================= */
-
-#tools {
-  grid-area: left;
-  border-right: 1px solid var(--line);
-  background: var(--panel);
-  padding: 18px 16px;
-  overflow-y: auto;
+.panel-title    {
+    color: var(--text-dim);
+    letter-spacing: 0.05em;
+    font-size: 16px;
+    margin-bottom: 12px;
 }
 
-.panel-title {
-  font-size: 11px;
-  color: var(--text-dim);
-  letter-spacing: 0.08em;
-  margin-bottom: 14px;
+.tool-item    {
+    color: var(--text);
+    font-size: 15px;
+    border: 1px solid transparent;
+    cursor: default;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    opacity: 0.35;;
 }
 
-.tool-item {
-  padding: 10px 10px;
-  margin-bottom: 4px;
-  border: 1px solid transparent;
-  color: var(--text-dim);
-  font-size: 13px;
-  cursor: default;
-  display: flex;
-  align-items: center;
-  gap: 10px;
+
+
+
+
+/* ==================================================== */
+/* Barra lateral de filtros à direita                   */
+/* =====================================================*/
+
+#filters    {
+    grid-area: right;
+    background: var(--panel);
+    border-left: 1px solid var(--line);
+    padding: 28px 20px;
+    overflow-y: auto;
 }
 
-.tool-item .glyph {
-  width: 14px;
-  text-align: center;
-  color: var(--accent-dim);
-  font-family: sans-serif;
-}
-
-.tool-item .soon {
-  margin-left: auto;
-  font-size: 10px;
-  color: #555;
-}
-
-/* ========================================================================================================= */
-/* Área central: a imagem carregada                                                                          */
-/* ========================================================================================================= */
-
-#canvas-area {
-  grid-area: canvas;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  overflow: auto;
-  background: linear-gradient(var(--bg), var(--bg));
-}
-
-#empty-state {
-  text-align: center;
-  color: var(--text-dim);
-  font-size: 14px;
-  line-height: 1.8;
-}
-
-#empty-state .big {
-  font-size: 13px;
-  letter-spacing: 0.04em;
-  color: var(--text);
-  margin-bottom: 6px;
-}
-
-#stage {
-  display: none;
-  position: relative;
-  box-shadow: 0 0 0 1px var(--line);
-}
-
-#stage img {
-  display: block;
-  max-width: 74vw;
-  max-height: 78vh;
-}
-
-/* ========================================================================================================= */
-/* Painel direito: lista de filtros                                                                          */
-/* ========================================================================================================= */
-
-#filters {
-  grid-area: right;
-  border-left: 1px solid var(--line);
-  background: var(--panel);
-  padding: 18px 16px;
-  overflow-y: auto;
+.panel-title    {
+    font-size: 11px;
+    letter-spacing: 0.05em;;
 }
 
 .filter-btn {
-  width: 100%;
-  text-align: left;
-  font-family: inherit;
-  font-size: 13px;
-  color: var(--text);
-  background: transparent;
-  border: 1px solid var(--panel-border);
-  padding: 10px 12px;
-  margin-bottom: 8px;
-  cursor: pointer;
-  transition: border-color 0.15s ease, color 0.15s ease;
+    width: 100%;;
+    border: 1px solid var(--box-border);
+    font-size: 15px;
+    font-family: inherit;
+    text-align: left;
+    margin-bottom: 10px;
+    padding: 10px 12px;
+    background: transparent;
+    color: var(--text);
+    cursor: pointer;
+    transition: border-color 0.15s ease, color 0.15s ease;
 }
 
-.filter-btn:hover:not(:disabled) {
-  border-color: var(--accent);
-  color: var(--accent);
+.filter-btn:hover:not(:disabled)   {
+    border-color: var(--highlight);
+    color: var(--highlight);
 }
 
 .filter-btn:disabled {
-  opacity: 0.3;
-  cursor: default;
+    opacity: 0.35;
+    cursor: default;
 }
 
-.filter-btn .tag {
-  float: right;
-  font-size: 10px;
-  color: #555;
+.filter-btn .tag    {
+    float: right;
+    font-size: 10px;
+    color: #555;
 }
 
-.section-gap {
-  height: 22px;
+.section-gap    {
+    height: 35px;
 }
 
-/* ========================================================================================================= */
-/* Painel direito: lista de camadas (filtros já aplicados)                                                  */
-/* ========================================================================================================= */
 
-#layers-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+
+
+
+/* ==================================================== */
+/* Seção de camadas de filtros à direita                */
+/* =====================================================*/
+
+#layers-list    {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
 }
 
-.layer-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  border: 1px solid var(--panel-border);
-  padding: 8px 10px;
-  font-size: 12px;
-  cursor: grab;
+.layer-row  {
+    display: flex;
+    border: 1px solid var(--box-border);
+    padding: 8px 10px;
+    gap: 8px;
+    font-size: 12px;
+    cursor: grab;
 }
 
-/* Classes aplicadas dinamicamente pelo JavaScript enquanto o usuário arrasta uma camada. */
-.layer-row.dragging {
-  opacity: 0.35;
+.layer-row.dragging     {
+    opacity: 0.35;
 }
 
-.layer-row.drag-over {
-  border-color: var(--accent);
+.layer-row.drag-over    {
+    border-color: var(--highlight);
 }
 
-.layer-row .name {
-  flex: 1;
-  color: var(--text);
+.layer-row .name     {
+    flex: 1;
+    color: var(--text-dim);
 }
 
-.layer-row .num {
-  color: var(--text-dim);
-  width: 16px;
+.layer-row .num     {
+    color: var(--text-dim);
+    width: 16px;
 }
 
-.layer-row button {
-  background: transparent;
-  border: none;
-  color: var(--text-dim);
-  cursor: pointer;
-  font-size: 13px;
-  line-height: 1;
-  padding: 2px 4px;
+.layer-row button   {
+    float: right;
+    border: none;
+    background: transparent;
+    color: var(--text-dim);
+    line-height: 1;
+    cursor: pointer;
 }
 
 .layer-row button:hover {
-  color: var(--danger);
+    color: var(--danger);
 }
 
-.layers-empty {
-  color: #555;
-  font-size: 12px;
-  font-style: italic;
+.layers-empty   {
+    color: #555;
+    font-size: 15px;
+    font-style: italic;
 }
 
-/* ========================================================================================================= */
-/* Janela flutuante de pré-visualização de filtro                                                           */
-/* ========================================================================================================= */
 
-.filter-window {
-  position: fixed;
-  width: 300px;
-  min-width: 220px;
-  min-height: 180px;
-  background: var(--panel);
-  border: 1px solid var(--accent-dim);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
-  z-index: 100;
-  font-family: "Georgia", serif;
-  display: flex;
-  flex-direction: column;
-  resize: both;   /* permite que o usuário aumente a janela pelo canto inferior direito */
-  overflow: hidden;
+
+
+
+/* ==================================================== */
+/* Área da imagem                                       */
+/* =====================================================*/
+
+#canvas-area    {
+    grid-area: canvas;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: auto;
+    background: var(--bg);
 }
 
-/* ---- cabeçalho da janela (arrastável) ---- */
-
-.filter-window .fw-head {
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--line);
-  font-size: 12.5px;
-  letter-spacing: 0.03em;
-  color: var(--accent);
-  cursor: grab;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  user-select: none;
+#empty-canvas   {
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 14px;
 }
 
-.filter-window .fw-head:active {
-  cursor: grabbing;
+#canvas     {
+    display: none;
+    position: relative;
+    box-shadow: 0 0 0 1px var(--line);
 }
 
-.filter-window .fw-close {
-  background: none;
-  border: none;
-  color: var(--text-dim);
-  cursor: pointer;
-  font-size: 15px;
-  line-height: 1;
+#canvas img     {
+    display: block;
+    max-width: 74vw;
+    max-height: 78vh;
 }
 
-.filter-window .fw-close:hover {
-  color: var(--danger);
+
+/* ==================================================== */
+/* janela de preview                                     */
+/* =====================================================*/
+
+
+.filter-window  {
+    position: fixed;
+    width: 300px;
+    min-width: 220px;
+    min-height: 180px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    font-family: "Georgia", serif;
+    resize: both;
+    overflow: hidden;
 }
 
-/* ---- corpo da janela (pré-visualização + controles) ---- */
+.filter-window .fw-head     {
+    display: flex;
+    padding: 10px 14px;
+    color: var(--text);
+    border-bottom: 1px solid var(--line);
+    cursor: grab;
+    letter-spacing: 0.03em;
+    font-size: 12.5px;
+    justify-content: space-between;
+    align-items: center;
+    user-select: none;
+}
+
+.filter-window .fw-head:active  {
+    cursor: grabbing;
+}
+
+.filter-window .fw-close    {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 15px;
+}
+
+.filter-window .fw-close:hover   {
+    color: var(--danger);
+}
 
 .filter-window .fw-body {
-  padding: 14px;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  overflow: auto;
+    display: flex;
+    min-height: 0;
+    overflow: auto;
+    flex: 1;
+    padding: 14px;
+    flex-direction: column;
 }
 
-.filter-window .fw-preview {
-  width: 100%;
-  flex: 1;
-  min-height: 80px;
-  background: #050505;
-  border: 1px solid var(--line);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  margin-bottom: 12px;
+.filter-window .fw-preview  {
+    display: flex;
+    width: 100%;
+    flex: 1;
+    background-color: #050505;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    margin-bottom: 12px;
+    border: 1px solid var(--box-border);
 }
 
-.filter-window .fw-preview img {
-  max-width: 100%;
-  max-height: 100%;
-  width: auto;
-  height: auto;
-  object-fit: contain;
+.filter-window .fw-preview img  {
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    object-fit: contain;
 }
 
-.filter-window .fw-preview .loading {
-  color: var(--text-dim);
-  font-size: 12px;
+.filter-window .fw-preview .loading     {
+    color: var(--text-dim);
+    font-size: 12px;
 }
 
-.filter-window .fw-control {
-  margin-bottom: 12px;
+.filter-window .fw-controls {
+    margin-bottom: 12px;
 }
 
-.filter-window .fw-control label {
-  display: block;
-  font-size: 11px;
-  color: var(--text-dim);
-  letter-spacing: 0.04em;
-  margin-bottom: 6px;
+.filter-window .fw-control-header   {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
 }
 
-.filter-window input[type="range"] {
-  width: 100%;
-  accent-color: var(--accent);
+.filter-window .fw-control-header label   {
+    display: block;
+    font-size: 14px;
+    color: var(--text-dim);
+    letter-spacing: 0.04em;
+    margin: 0;
 }
 
+.filter-window .fw-value    {
+    width: 60px;
+    background: transparent;
+    border: 1px solid var(--box-border);
+    color: var(--text-dim);
+    text-align: center;
+    font-size: 14px;
+    padding: 3px 4px;
+}
+
+/* ----------------------------------------------------------*/
+
+/* Tira as setas da input numérica */
+/* Chrome, Edge, Safari (motor WebKit/Blink) */
+.filter-window .fw-value::-webkit-outer-spin-button,
+.filter-window .fw-value::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Firefox */
 .filter-window .fw-value {
-  color: var(--accent);
-  font-size: 11px;
-  float: right;
+    appearance: textfield;
+  -moz-appearance: textfield;
+}
+/* ----------------------------------------------------------*/
+
+.filter-window .fw-controls input[type="range"] {
+    width: 100%;
+    accent-color: var(--highlight);
 }
 
-.fw-apply {
-  width: 100%;
-  font-family: inherit;
-  font-size: 13px;
-  padding: 9px;
-  background: transparent;
-  border: 1px solid var(--accent);
-  color: var(--accent);
-  cursor: pointer;
-  transition: background 0.15s ease;
+
+
+.fw-apply   {
+    width: 100%;
+    font-family: inherit;
+    font-size: 13px;
+    padding: 9px;
+    background: transparent;
+    border: 1px solid var(--highlight);
+    color: var(--highlight);
+    cursor: pointer;
+    transition: background 0.15s ease;
 }
 
 .fw-apply:hover {
-  background: var(--accent);
-  color: #14120c;
+    background: var(--highlight);
+    color: var(--panel);
 }
