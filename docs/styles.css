@@ -1,4 +1,3 @@
-
 :root   {
     --bg: #0a0a0a;
     --panel: #080808;
@@ -434,4 +433,224 @@ input[type="file"]  {
 .fw-apply:hover {
     background: var(--highlight);
     color: var(--panel);
+}
+
+
+
+
+/* ==================================================== */
+/* Curva de tons (correção de gama)                     */
+/* =====================================================*/
+
+/* janela mais larga para acomodar preview + curva lado a lado */
+.filter-window.fw-wide  {
+    width: 520px;
+    min-width: 420px;
+}
+
+.filter-window .fw-body-split   {
+    flex-direction: row;
+    align-items: stretch;
+    gap: 14px;
+}
+
+.filter-window .fw-col-main     {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 0;
+    min-width: 0;
+}
+
+.filter-window .fw-col-curve    {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    width: 180px;
+    flex: 0 0 180px;
+}
+
+.filter-window .fw-curve    {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1;
+    margin-bottom: 12px;
+    border: 1px solid var(--box-border);
+    background: #050505;
+}
+
+.filter-window .fw-curve canvas     {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.filter-window .fw-curve-handle     {
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--highlight);
+    border: 2px solid var(--panel);
+    box-shadow: 0 0 6px rgba(139, 6, 233, 0.8);
+    cursor: grab;
+    transform: translate(-50%, -50%);
+}
+
+.filter-window .fw-curve-handle:active  {
+    cursor: grabbing;
+}
+
+.filter-window .fw-gamma-value  {
+    color: var(--highlight);
+}
+
+
+/* ==================================================== */
+/* Função linear por partes                             */
+/* =====================================================*/
+
+.filter-window .fw-channel-tabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 10px;
+}
+
+.filter-window .fw-channel-tab {
+    flex: 1;
+    font-family: inherit;
+    font-size: 12px;
+    padding: 6px 0;
+    background: transparent;
+    border: 1px solid var(--box-border);
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.filter-window .fw-channel-tab:hover {
+    color: var(--text);
+    border-color: var(--text-dim);
+}
+
+.filter-window .fw-channel-tab.active {
+    color: var(--highlight);
+    border-color: var(--highlight);
+}
+
+.filter-window .fw-curve-hint {
+    font-size: 10.5px;
+    color: var(--text-dim);
+    line-height: 1.4;
+    margin-top: 4px;
+}
+
+.filter-window .fw-point-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 160px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.filter-window .fw-point-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.filter-window .fw-point-row .fw-value {
+    width: 52px;
+}
+
+.filter-window .fw-point-sep {
+    color: var(--text-dim);
+}
+
+.filter-window .fw-point-remove {
+    margin-left: auto;
+    border: none;
+    background: transparent;
+    color: var(--text-dim);
+    font-size: 13px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 4px 6px;
+}
+
+.filter-window .fw-point-remove:hover:not(:disabled) {
+    color: var(--danger);
+}
+
+.filter-window .fw-point-remove:disabled {
+    opacity: 0.3;
+    cursor: default;
+}
+
+
+/* ==================================================== */
+/* Esteganografia                                       */
+/* =====================================================*/
+
+.filter-window .fw-textarea {
+    width: 100%;
+    background: transparent;
+    border: 1px solid var(--box-border);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 13px;
+    padding: 8px;
+    resize: vertical;
+}
+
+.filter-window .fw-textarea:focus {
+    outline: none;
+    border-color: var(--highlight);
+}
+
+.filter-window .fw-capacity {
+    font-size: 11.5px;
+    color: var(--text-dim);
+    margin-top: 6px;
+}
+
+.filter-window .fw-capacity.over {
+    color: var(--danger);
+}
+
+.filter-window .fw-stego-read .fw-read-btn {
+    margin-bottom: 8px;
+}
+
+.filter-window .fw-read-btn {
+    width: 100%;
+    font-family: inherit;
+    font-size: 13px;
+    padding: 9px;
+    background: transparent;
+    border: 1px solid var(--box-border);
+    color: var(--text);
+    cursor: pointer;
+    transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.filter-window .fw-read-btn:hover {
+    border-color: var(--highlight);
+    color: var(--highlight);
+}
+
+.filter-window .fw-read-status {
+    font-size: 11.5px;
+    color: var(--text-dim);
+    margin-top: 6px;
+}
+
+.fw-apply:disabled {
+    opacity: 0.35;
+    cursor: default;
+}
+
+.fw-apply:disabled:hover {
+    background: transparent;
+    color: var(--highlight);
 }
