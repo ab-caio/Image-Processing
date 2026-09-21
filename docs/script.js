@@ -1,408 +1,525 @@
-(function () {
-  "use strict";
 
-  // ============================================================================================================
-  // Variáveis
-  // ============================================================================================================
+// ================================================================================================================
+// Variáveis
+// ================================================================================================================
 
-  // Elementos da página que o código vai ler ou modificar.
-  var mainImage    = document.getElementById("main-image");
-  var stage        = document.getElementById("stage");
-  var emptyState   = document.getElementById("empty-state");
-  var fileInput    = document.getElementById("file-input");
-  var saveBtn      = document.getElementById("save-btn");
-  var btnNegativo  = document.getElementById("btn-negativo");
-  var btnLimiar    = document.getElementById("btn-limiar");
-  var layersList   = document.getElementById("layers-list");
+const mainImage = document.getElementById("main-img");
+const canvas = document.getElementById("canvas");
+const emptyCanvas = document.getElementById("empty-canvas");
+const imgInput = document.getElementById("img-input");
+const saveBtn = document.getElementById("save-btn");
+const negativeBtn = document.getElementById("negative");
+const thresholdBtn = document.getElementById("threshold");
+const brightnessBtn = document.getElementById("brightness");
 
-  // "originalJimp" guarda a imagem exatamente como foi aberta pelo usuário.
-  // Ela nunca é alterada diretamente — é sempre clonada antes de qualquer filtro.
-  var originalJimp = null;
+const layersList = document.getElementById("layers-list");
+const layersEmpty = document.querySelector(".layers-empty");
 
-  // "layers" é a lista de filtros já aplicados, na ordem em que devem ser
-  // recalculados. Cada item é um objeto simples, por exemplo:
-  //   { label: "Negativo", type: "negativo" }
-  //   { label: "Limiarização (128)", type: "limiar", value: 128 }
-  var layers = [];
 
-  // ============================================================================================================
-  // Funções auxiliares de estado da tela
-  // ============================================================================================================
+let originalImg = null;
+let imgName = "";
+let layers = [];
 
-  // Ativa ou desativa os botões que só fazem sentido quando existe uma imagem carregada.
-  function setControlsEnabled(enabled) {
-    saveBtn.disabled     = !enabled;
-    btnNegativo.disabled = !enabled;
-    btnLimiar.disabled   = !enabled;
-  }
 
-  // Redesenha a lista de camadas no painel direito, a partir do array "layers".
-  // É chamada sempre que uma camada é adicionada, removida ou reordenada.
-  function refreshLayersPanel() {
+// ================================================================================================================
+// Funções auxiliares de interface
+// ================================================================================================================
+
+
+// Ativa ou desativa botões que precisam de uma imagem caregada
+function setControlEnable(enabled) {
+    saveBtn.disabled = !enabled;
+    negativeBtn.disabled = !enabled;
+    thresholdBtn.disabled = !enabled;
+    brightnessBtn.disabled = !enabled;
+}
+
+
+
+
+// Reordena a seção de camadas de acordo com o array layers
+// É chamada sempre que uma camada é adicionada, removida ou deslocada
+
+function updateLayersPanel() {
     layersList.innerHTML = "";
 
-    if (layers.length === 0) {
-      var empty = document.createElement("div");
-      empty.className = "layers-empty";
-      empty.textContent = "Nenhum filtro aplicado";
-      layersList.appendChild(empty);
-      return;
+    if (layers.length == 0) {
+        layersEmpty.style.display = "block"
+        return;
     }
 
-    layers.forEach(function (layer, index) {
-      var row = criarLinhaDeCamada(layer, index);
-      layersList.appendChild(row);
-    });
-  }
+    layersEmpty.style.display = "none";
 
-  // Cria o elemento HTML de uma única linha da lista de camadas,
-  // já com o número, o nome, o botão de remover e o arrastar-e-soltar.
-  function criarLinhaDeCamada(layer, index) {
-    var row = document.createElement("div");
+    layers.forEach((layer, index) => {
+        const row = createLayerRow(layer, index);
+        layersList.appendChild(row);
+    });
+}
+
+
+
+
+// Cria o element HTMl de uma linha da lista de camadas
+
+function createLayerRow(layer, index) {
+    const row = document.createElement("div");
     row.className = "layer-row";
     row.draggable = true;
 
-    var num = document.createElement("span");
+    const num = document.createElement("span");
     num.className = "num";
-    num.textContent = String(index + 1);
+    num.textContent = `${index + 1}`;
 
-    var name = document.createElement("span");
+    const name = document.createElement("span");
     name.className = "name";
     name.textContent = layer.label;
 
-    var removeBtn = document.createElement("button");
-    removeBtn.textContent = "×";
+    const removeBtn = document.createElement("button");
+    removeBtn.textContent = "x";
     removeBtn.title = "Remover camada";
-    removeBtn.addEventListener("click", function () {
-      layers.splice(index, 1);
-      refreshLayersPanel();
-      rebuildImageFromLayers();
+    removeBtn.addEventListener("click", () => {
+        layers.splice(index, 1);
+        updateLayersPanel();
+        rebuildImageFromLayers();
     });
 
-    ligarEventosDeArrastar(row, index);
+    enableDragEvent(row, index);
 
     row.appendChild(num);
     row.appendChild(name);
     row.appendChild(removeBtn);
     return row;
-  }
+}
 
-  // ============================================================================================================
-  // Arrastar e soltar camadas (reordenar os filtros)
-  // ============================================================================================================
 
-  // Liga os eventos nativos de "drag and drop" do navegador a uma linha da
-  // lista de camadas, permitindo arrastá-la para cima ou para baixo.
-  function ligarEventosDeArrastar(row, index) {
 
-    // Início do arraste: guarda de onde a camada está saindo.
-    row.addEventListener("dragstart", function () {
-      row.classList.add("dragging");
-      row.dataset.fromIndex = index;
+
+// Habilita o evento de arrasto para as camadas
+
+function enableDragEvent(row, index) {
+    row.addEventListener("dragstart", () => {
+        row.classList.add("dragging");
+        row.dataset.fromIndex = index;
     });
 
-    // Fim do arraste (soltou ou cancelou): remove o destaque visual.
-    row.addEventListener("dragend", function () {
-      row.classList.remove("dragging");
+
+    row.addEventListener("dragend", () => {
+        row.classList.remove("dragging");
     });
 
-    // O navegador exige "preventDefault" aqui para permitir soltar o item.
-    row.addEventListener("dragover", function (event) {
-      event.preventDefault();
-      row.classList.add("drag-over");
+    
+    row.addEventListener("dragover", (event) => {
+        event.preventDefault();
+        row.classList.add("drag-over");
     });
 
-    row.addEventListener("dragleave", function () {
-      row.classList.remove("drag-over");
+    
+    row.addEventListener("dragleave", () => {
+        row.classList.remove("drag-over");
     });
 
-    // Soltou a camada em cima desta linha: move no array para a nova posição.
-    row.addEventListener("drop", function (event) {
-      event.preventDefault();
-      row.classList.remove("drag-over");
 
-      var linhaArrastada = document.querySelector(".dragging");
-      var fromIndex = Number(linhaArrastada.dataset.fromIndex);
+    row.addEventListener("drop", (event) => {
+        event.preventDefault();
+        row.classList.remove("drag-over");
 
-      var camadaMovida = layers.splice(fromIndex, 1)[0];
-      layers.splice(index, 0, camadaMovida);
+        const movedRow = document.querySelector(".dragging");
+        const fromIndex = Number(movedRow.dataset.fromIndex);
 
-      refreshLayersPanel();
-      rebuildImageFromLayers();
+        const [movedLayer] = layers.splice(fromIndex, 1);
+        layers.splice(index, 0, movedLayer);
+
+        updateLayersPanel();
+        rebuildImageFromLayers();
     });
-  }
+}
 
-  // ============================================================================================================
-  // Efeitos
-  // ============================================================================================================
 
-  // Aplica um único filtro sobre uma imagem Jimp já aberta.
-  // Esta função é o "motor" de todos os filtros: tanto a pré-visualização
-  // quanto o resultado final passam por aqui.
-  function applyFilterToJimp(jimpImage, layer) {
 
-    // ----------------------------------------------------------------------------------------------------------
-    // negativo
-    // ----------------------------------------------------------------------------------------------------------
 
-    if (layer.type === "negativo") {
-      jimpImage.invert();
+// ================================================================================================================
+// Efeitos
+// ================================================================================================================
+
+
+// aplica um filtro por vez na imagem de acordo com a ordem das camadas
+
+function applyFilter(jimpImg, layer) {
+
+    if (layer.type === "negative") {
+        applyInversion(jimpImg);
     }
 
-    // ----------------------------------------------------------------------------------------------------------
-    // limiarização
-    // ----------------------------------------------------------------------------------------------------------
-
-    else if (layer.type === "limiar") {
-      var limite = layer.value;
-
-      // "scan" percorre cada pixel da imagem. Para cada um, calculamos a
-      // média dos canais vermelho, verde e azul e comparamos com o limite:
-      // se for maior ou igual, o pixel vira branco; senão, vira preto.
-      jimpImage.scan(0, 0, jimpImage.bitmap.width, jimpImage.bitmap.height, function (x, y, idx) {
-        var vermelho = this.bitmap.data[idx];
-        var verde    = this.bitmap.data[idx + 1];
-        var azul     = this.bitmap.data[idx + 2];
-        var media    = (vermelho + verde + azul) / 3;
-
-        var saida = media >= limite ? 255 : 0;
-
-        this.bitmap.data[idx]     = saida;
-        this.bitmap.data[idx + 1] = saida;
-        this.bitmap.data[idx + 2] = saida;
-      });
+    else if (layer.type === "threshold") {
+        applyThreshold(jimpImg, layer);
     }
 
-    return jimpImage;
-  }
-
-  // Recalcula a imagem exibida na tela, partindo sempre da imagem original
-  // e aplicando, em ordem, cada camada da lista "layers".
-  function rebuildImageFromLayers() {
-    var working = originalJimp.clone();
-
-    layers.forEach(function (layer) {
-      applyFilterToJimp(working, layer);
-    });
-
-    working.getBase64(Jimp.MIME_PNG, function (err, base64) {
-      if (err) return;
-      mainImage.src = base64;
-    });
-  }
-
-  // ============================================================================================================
-  // Abrir e salvar arquivos
-  // ============================================================================================================
-
-  // ----------------------------------------------------------------------------------------------------------
-  // abrir imagem
-  // ----------------------------------------------------------------------------------------------------------
-
-  fileInput.addEventListener("change", function (event) {
-    var file = event.target.files[0];
-    if (!file) return;
-
-    if (!file.type.startsWith("image/")) {
-      alert("Selecione um arquivo de imagem.");
-      return;
+    else if (layer.type === "brightness") {
+        changeBrightness(jimpImg, layer);
     }
 
-    var reader = new FileReader();
-    reader.onload = function () {
-      Jimp.read(reader.result).then(function (jimpImage) {
-        originalJimp = jimpImage;
+    else if (layer.type === "gamma") {
+        gamaCorrection(jimpImg);
+    }
+
+
+    return jimpImg;
+}
+
+
+// refaz a imagem do zer0, aplicando os efeitos na ordem que
+// estão no array layers
+
+async function rebuildImageFromLayers() {
+    const working = originalImg.clone();
+    layers.forEach((layer) => applyFilter(working, layer));
+
+    const base64 = await working.getBase64Async(Jimp.MIME_PNG);
+    mainImage.src = base64;
+}
+
+
+// ------------------------------
+// Função de inversão (Negativo)
+
+async function applyInversion(jimpImg) {
+    jimpImg.scan(0, 0, jimpImg.bitmap.width, jimpImg.bitmap.height, function(x, y, idx) {
+        this.bitmap.data[idx + 0] = 255 - this.bitmap.data[idx + 0]; // o zero é so pra deixar bonito
+        this.bitmap.data[idx + 1] = 255 - this.bitmap.data[idx + 1];
+        this.bitmap.data[idx + 2] = 255 - this.bitmap.data[idx + 2];
+    });
+    return jimpImg;
+}
+
+
+// ------------------------------
+// Função de limiarização
+
+async function applyThreshold(jimpImg, layer) {
+    const limit = layer.value;
+
+    jimpImg.scan(0, 0, jimpImg.bitmap.width, jimpImg.bitmap.height, function(x, y, idx) {
+        const R = this.bitmap.data[idx + 0];
+        const G = this.bitmap.data[idx + 1];
+        const B = this.bitmap.data[idx + 2];
+        const mean = (R + G + B) / 3;
+
+        const output = mean >= limit ? 255 : 0;
+
+        this.bitmap.data[idx + 0] = output;
+        this.bitmap.data[idx + 1] = output;
+        this.bitmap.data[idx + 2] = output;
+    });
+    return jimpImg;
+}
+
+
+// ------------------------------
+// Função de brilho
+
+async function changeBrightness(jimpImg, layer) {
+    const toAdd = layer.value;
+
+    jimpImg.scan(0, 0, jimpImg.bitmap.width, jimpImg.bitmap.height, function(x, y, idx) {
+        const R = this.bitmap.data[idx + 0] + toAdd;
+        const G = this.bitmap.data[idx + 1] + toAdd;
+        const B = this.bitmap.data[idx + 2] + toAdd;
+
+        this.bitmap.data[idx + 0] = Math.min(255, Math.max(0, R));
+        this.bitmap.data[idx + 1] = Math.min(255, Math.max(0, G));
+        this.bitmap.data[idx + 2] = Math.min(255, Math.max(0, B));
+    });
+    return jimpImg;
+}
+
+
+// ------------------------------
+// Função de correção de gama
+
+async function gamaCorrection(jimpImg, layer) {
+    const invGamma = 1 / gamma;
+
+    // lookup table para facilitar o cálculo
+    const lut = new Uint8ClampedArray(256);
+    for (let i = 0; i < 256; i++) {
+        const normalized = i / 255;
+        const corrected = Math.pow(normalized, invGamma);
+        lut[i] = Math.round(corrected * 255);
+    }
+
+    jimpImg.scan(0, 0, jimpImg.bitmap.width, jimpImg.bitmap.height, function(x, y, idx) {
+        this.bitmap.data[idx + 0] = 255 - lut[bitmap.data[idx + 0]]; 
+        this.bitmap.data[idx + 1] = 255 - lut[bitmap.data[idx + 1]];
+        this.bitmap.data[idx + 2] = 255 - lut[bitmap.data[idx + 2]];
+    });
+    return jimpImg; 
+}
+
+// ================================================================================================================
+// Abrir e salvar imagens
+// ================================================================================================================
+
+
+// abrir
+
+imgInput.addEventListener("change", async (event) => {
+    const [img] = event.target.files;
+    if (!img) return;
+
+    if (!img.type.startsWith("image/")) {
+        alert("Selecione uma imagem.");
+        return;
+    }
+
+    const fileName = img.name;
+    imgName = fileName;
+
+    try {
+        const content = await img.arrayBuffer();
+        originalImg = await Jimp.read(content);
         layers = [];
 
-        refreshLayersPanel();
-        setControlsEnabled(true);
+        updateLayersPanel();
+        setControlEnable(true);
 
-        emptyState.style.display = "none";
-        stage.style.display = "block";
+        emptyCanvas.style.display = "none";
+        canvas.style.display = "block";
 
-        rebuildImageFromLayers();
-      }).catch(function () {
-        alert("Não foi possível abrir esta imagem.");
-      });
-    };
-    reader.readAsArrayBuffer(file);
-  });
+        await rebuildImageFromLayers();
+    } catch (err) {
+        console.error(err);
+        alert("Não foi possível abrir a imagem.")
+    }
+});
 
-  // ----------------------------------------------------------------------------------------------------------
-  // salvar imagem
-  // ----------------------------------------------------------------------------------------------------------
 
-  saveBtn.addEventListener("click", function () {
-    var working = originalJimp.clone();
 
-    layers.forEach(function (layer) {
-      applyFilterToJimp(working, layer);
+// salvar
+
+saveBtn.addEventListener("click", async () => {
+    const working = originalImg.clone();
+    layers.forEach((layer) => applyFilter(working, layer));
+
+    const base64 = await working.getBase64Async(Jimp.MIME_PNG);
+
+    const link = document.createElement("a");
+    link.href = base64;
+    link.download = `${imgName}-editada.png`;
+    link.click();
+});
+
+
+
+
+// ================================================================================================================
+// Janela flutuante de preview
+// ================================================================================================================
+
+// centraliza a janela na posição (x, y) do mouse
+function placeAtCursor(win, x, y) {
+    const width = win.offsetWidth;
+    win.style.left = `${x - width/2}px`;
+    win.style.top = `${y}px`;
+}
+
+
+
+// ativa a funcionalidade de arrasto da janela
+
+function enableDragging(win, head) {
+    head.addEventListener("mousedown", (event) => {
+
+
+        // fw-close representa o botão fechar da janela
+        // de preview que será criada depois
+
+        if (event.target.closest(".fw-close")) return;
+
+        event.preventDefault();
+        placeAtCursor(win, event.clientX, event.clientY);
+
+        const onMove = (moveEvent) => {
+            placeAtCursor(win, moveEvent.clientX, moveEvent.clientY);
+        };
+
+        const onUp = () => {
+            document.removeEventListener("mousemove", onMove);
+            document.removeEventListener("mouseup", onUp);
+        }
+
+        document.addEventListener("mousemove", onMove);
+        document.addEventListener("mouseup", onUp);
     });
+}
 
-    working.getBase64(Jimp.MIME_PNG, function (err, base64) {
-      if (err) return;
 
-      var link = document.createElement("a");
-      link.href = base64;
-      link.download = "imagem-editada.png";
-      link.click();
-    });
-  });
+// criação da estrutura HTML da janela de preview de filtros
+// note que fw = filter window
 
-  // ============================================================================================================
-  // Janela flutuante de pré-visualização de filtro
-  // ============================================================================================================
-
-  // Move a janela para que fique centralizada na posição (x, y) do mouse.
-  function posicionarNoCursor(win, x, y) {
-    var largura = win.offsetWidth;
-    win.style.left = (x - largura / 2) + "px";
-    win.style.top = y + "px";
-  }
-
-  // Torna uma janela arrastável: ao pressionar o mouse no cabeçalho, a
-  // janela salta para a posição do cursor e passa a segui-lo até soltar.
-  function tornarArrastavel(win, head) {
-    head.addEventListener("mousedown", function (event) {
-
-      // Clicar no botão de fechar não deve mover a janela.
-      if (event.target.closest(".fw-close")) return;
-
-      event.preventDefault();
-      posicionarNoCursor(win, event.clientX, event.clientY);
-
-      function onMove(moveEvent) {
-        posicionarNoCursor(win, moveEvent.clientX, moveEvent.clientY);
-      }
-
-      function onUp() {
-        document.removeEventListener("mousemove", onMove);
-        document.removeEventListener("mouseup", onUp);
-      }
-
-      document.addEventListener("mousemove", onMove);
-      document.addEventListener("mouseup", onUp);
-    });
-  }
-
-  // Cria a estrutura HTML de uma janela de filtro vazia (cabeçalho + corpo)
-  // e já liga o arrastar e o botão de fechar. Os controles específicos de
-  // cada filtro são preenchidos depois, fora desta função.
-  function criarJanelaFiltro(titulo) {
-    var win = document.createElement("div");
+function createFilterWindow(title) {
+    const win = document.createElement("div");
     win.className = "filter-window";
     win.style.left = "50%";
     win.style.top = "120px";
 
-    win.innerHTML =
-      '<div class="fw-head">' +
-        '<span>' + titulo + '</span>' +
-        '<button class="fw-close">×</button>' +
-      '</div>' +
-      '<div class="fw-body">' +
-        '<div class="fw-preview"><span class="loading">Gerando pré-visualização…</span></div>' +
-        '<div class="fw-controls"></div>' +
-        '<button class="fw-apply">Aplicar</button>' +
-      '</div>';
+    win.innerHTML = `
+        <div class="fw-head">
+            <span>${title}</span>
+            <button class="fw-close">x</button>
+        </div>
+        <div class="fw-body">
+            <div class="fw-preview"><span class="loading">Gerando pré-visualização..</span></div>
+            <div class="fw-controls"></div>
+            <button class="fw-apply">Aplicar</button>
+        </div>
+    `;
 
     document.body.appendChild(win);
 
-    var head = win.querySelector(".fw-head");
-    tornarArrastavel(win, head);
+    const head = win.querySelector(".fw-head");
+    enableDragging(win, head);
 
-    win.querySelector(".fw-close").addEventListener("click", function () {
-      win.remove();
+    win.querySelector(".fw-close").addEventListener("click", () => {
+        win.remove();
     });
 
     return win;
-  }
+}
 
-  // Gera a imagem de pré-visualização (a partir de um Jimp já filtrado) e
-  // a exibe dentro da janela de filtro.
-  function mostrarPreview(win, jimpImage) {
-    jimpImage.getBase64(Jimp.MIME_PNG, function (err, base64) {
-      if (err) return;
 
-      var preview = win.querySelector(".fw-preview");
-      preview.innerHTML = "";
+// gera a imagem adaptada para preview
 
-      var img = document.createElement("img");
-      img.src = base64;
-      preview.appendChild(img);
+async function showPreview(win, jimpImg) {
+    const base64 = await jimpImg.getBase64Async(Jimp.MIME_PNG);
+
+    const preview = win.querySelector(".fw-preview");
+    preview.innerHTML = "";
+
+    const img = document.createElement("img");
+    img.src = base64;
+    preview.appendChild(img);
+}
+
+
+// ================================================================================================================
+// Botões de filtro
+// ================================================================================================================
+
+negativeBtn.addEventListener("click", () => {
+    const win = createFilterWindow("Negativo");
+
+
+    // aplica todos os filtros já aplicados
+    // e depois aplica o efeito para visualização
+    const preview = originalImg.clone();
+    layers.forEach((layer) => applyFilter(preview, layer));
+    applyFilter(preview, { type: "negative"});
+    showPreview(win, preview);
+
+    win.querySelector(".fw-apply").addEventListener("click", () => {
+        layers.push({ label: "Negativo", type: "negative"});
+        updateLayersPanel();
+        rebuildImageFromLayers();
+        win.remove();
     });
-  }
+});
 
-  // ============================================================================================================
-  // Botões de filtro
-  // ============================================================================================================
+// ================================================================================
 
-  // ----------------------------------------------------------------------------------------------------------
-  // negativo
-  // ----------------------------------------------------------------------------------------------------------
+thresholdBtn.addEventListener("click", () => {
+    const win = createFilterWindow("Limiarização");
+    const controls = win.querySelector(".fw-controls");
 
-  btnNegativo.addEventListener("click", function () {
-    var win = criarJanelaFiltro("Negativo");
+    controls.innerHTML = `
+    <div class="fw-control">
+        <div class="fw-control-header">
+            <label> Limiarização </label>
+            <input class="fw-value" type="number" min="0" max="255" value="128">
+        </div>
+        <input type="range" min="0" max="255" value="128">
+    </div>
+    `;
 
-    // Monta a pré-visualização: pega a imagem já com as camadas atuais e
-    // acrescenta o negativo por cima, só para exibição.
-    var preview = originalJimp.clone();
-    layers.forEach(function (layer) {
-      applyFilterToJimp(preview, layer);
-    });
-    applyFilterToJimp(preview, { type: "negativo" });
-    mostrarPreview(win, preview);
+    const range = controls.querySelector('input[type="range"]');
+    const valueInput = controls.querySelector('input[type="number"]');
 
-    // Só quando o usuário clicar em "Aplicar" a camada entra de fato na lista.
-    win.querySelector(".fw-apply").addEventListener("click", function () {
-      layers.push({ label: "Negativo", type: "negativo" });
-      refreshLayersPanel();
-      rebuildImageFromLayers();
-      win.remove();
-    });
-  });
+    function updateThresholdPreview() {
+        const thresholdValue = Number(range.value);
+        valueInput.value = thresholdValue;
 
-  // ----------------------------------------------------------------------------------------------------------
-  // limiarização
-  // ----------------------------------------------------------------------------------------------------------
-
-  btnLimiar.addEventListener("click", function () {
-    var win = criarJanelaFiltro("Limiarização");
-    var controls = win.querySelector(".fw-controls");
-
-    // Controle deslizante (0 a 255) para escolher o limite de corte.
-    controls.innerHTML =
-      '<div class="fw-control">' +
-        '<label>Limite <span class="fw-value">128</span></label>' +
-        '<input type="range" min="0" max="255" value="128">' +
-      '</div>';
-
-    var range = controls.querySelector("input");
-    var valueLabel = controls.querySelector(".fw-value");
-
-    // Recalcula a pré-visualização toda vez que o usuário move o controle.
-    function atualizarPreview() {
-      var limite = Number(range.value);
-      valueLabel.textContent = limite;
-
-      var preview = originalJimp.clone();
-      layers.forEach(function (layer) {
-        applyFilterToJimp(preview, layer);
-      });
-      applyFilterToJimp(preview, { type: "limiar", value: limite });
-      mostrarPreview(win, preview);
+        const preview = originalImg.clone();
+        layers.forEach((layer) => applyFilter(preview, layer));
+        applyFilter(preview, { type: "threshold", value: thresholdValue});
+        showPreview(win, preview);
     }
 
-    range.addEventListener("input", atualizarPreview);
-    atualizarPreview();
+    range.addEventListener("input", updateThresholdPreview);
 
-    // Só quando o usuário clicar em "Aplicar" a camada entra de fato na lista.
-    win.querySelector(".fw-apply").addEventListener("click", function () {
-      var limite = Number(range.value);
-      layers.push({ label: "Limiarização (" + limite + ")", type: "limiar", value: limite });
-      refreshLayersPanel();
-      rebuildImageFromLayers();
-      win.remove();
+    valueInput.addEventListener("input", () => {
+        let typed = Number(valueInput.value);
+
+        typed = Math.min(255, Math.max(0, typed));
+        range.value = typed;
+        updateThresholdPreview();
     });
-  });
 
-})();
+    updateThresholdPreview();
+
+    win.querySelector(".fw-apply").addEventListener("click", () => {
+        const thresholdValue = Number(range.value);
+        layers.push({ label: `Limiarização (${thresholdValue})`, type: "threshold", value: thresholdValue });
+        updateLayersPanel();
+        rebuildImageFromLayers();
+        win.remove();
+    });
+});
+
+// ================================================================================
+
+brightnessBtn.addEventListener("click", () => {
+    const win = createFilterWindow("Brilho");
+    const controls = win.querySelector(".fw-controls");
+
+    controls.innerHTML = `
+    <div class="fw-control">
+        <div class="fw-control-header">
+            <label> Brilho </label>
+            <input class="fw-value" type="number" min="-255" max="255" value="0">
+        </div>
+        <input type="range" min="-255" max="255" value="0">
+    </div>
+    `;
+
+    const range = controls.querySelector('input[type="range"]');
+    const valueInput = controls.querySelector('input[type="number"]');
+
+    function updateBrightnessPreview() {
+        const brightnessValue = Number(range.value);
+        valueInput.value = brightnessValue;
+
+        const preview = originalImg.clone();
+        layers.forEach((layer) => applyFilter(preview, layer));
+        applyFilter(preview, { type: "brightness", value: brightnessValue});
+        showPreview(win, preview);
+    }
+
+    range.addEventListener("input", updateBrightnessPreview);
+
+    valueInput.addEventListener("input", () => {
+        let typed = Number(valueInput.value);
+
+        typed = Math.min(255, Math.max(-255, typed));
+        range.value = typed;
+        updateBrightnessPreview();
+    });
+
+    updateBrightnessPreview();
+
+    win.querySelector(".fw-apply").addEventListener("click", () => {
+        const brightnessValue = Number(range.value);
+        layers.push({ label: "Brilho", type: "brightness", value: brightnessValue });
+        updateLayersPanel();
+        rebuildImageFromLayers();
+        win.remove();
+    });
+});
