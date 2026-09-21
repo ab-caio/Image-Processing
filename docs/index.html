@@ -1,79 +1,86 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
-<head>
-<meta charset="UTF-8">
-<title>Escurecer — editor de imagem</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>Processador de Imagens</title>
 
-<!-- ======================================================================================================= -->
-<!-- Biblioteca Jimp (edita imagens em JavaScript, sem precisar de canvas ou de um servidor)                 -->
-<!-- ======================================================================================================= -->
-<script src="https://cdn.jsdelivr.net/npm/jimp@0.22.12/browser/lib/jimp.js"></script>
+        <!-------------------------------------------------->
+        <!-- Biblioteca Jimp para processamento de imagens-->
 
-<!-- Estilo visual da página (cores, layout, janelas flutuantes etc.) -->
-<link rel="stylesheet" href="styles.css">
-</head>
-<body>
+        <script src="https://cdn.jsdelivr.net/npm/jimp@0.22.12/browser/lib/jimp.js"></script>
 
-<!-- =========================================================================================================== -->
-<!-- Barra do topo: título, botão de abrir arquivo e botão de salvar                                            -->
-<!-- =========================================================================================================== -->
+        <!-- ----------------------------------------------->
+         <link rel="stylesheet" href="styles.css">
 
-<header>
-  <h1>Escurecer<span>.</span></h1>
-  <div class="top-actions">
-    <label class="file-btn" for="file-input">Abrir imagem</label>
-    <input type="file" id="file-input" accept="image/*">
-    <button class="action-btn" id="save-btn" disabled>Salvar</button>
-  </div>
-</header>
+    </head>
+    <body>
 
-<!-- =========================================================================================================== -->
-<!-- Painel esquerdo: ferramentas (ainda não implementadas, apenas espaço reservado)                            -->
-<!-- =========================================================================================================== -->
 
-<aside id="tools">
-  <div class="panel-title">FERRAMENTAS</div>
-  <div class="tool-item"><span class="glyph">⬚</span> Cortar <span class="soon">em breve</span></div>
-  <div class="tool-item"><span class="glyph">◇</span> Selecionar <span class="soon">em breve</span></div>
-  <div class="tool-item"><span class="glyph">✎</span> Desenhar <span class="soon">em breve</span></div>
-</aside>
 
-<!-- =========================================================================================================== -->
-<!-- Área central: a imagem carregada aparece aqui, centralizada                                                -->
-<!-- =========================================================================================================== -->
+        <!---------------- Barra superior ------------------>
+        <!-- contém os botões de escolher imagem e salvar -->
+        <header>
+            <h1>Procimg</h1>
+            <div id="top-area">
+                <input type="file" id="img-input" accept="image/*">
+                <label class="file-btn" for="img-input">Escolher imagem</label>
+                <button class="action-btn" id="save-btn" disabled>Salvar</button>
+            </div>
+        </header>
 
-<section id="canvas-area">
-  <div id="empty-state">
-    <div class="big">Nenhuma imagem carregada</div>
-    Abra um arquivo para começar
-  </div>
-  <div id="stage">
-    <img id="main-image" alt="imagem carregada">
-  </div>
-</section>
 
-<!-- =========================================================================================================== -->
-<!-- Painel direito: lista de filtros disponíveis e lista de camadas já aplicadas                               -->
-<!-- =========================================================================================================== -->
 
-<aside id="filters">
-  <div class="panel-title">FILTROS</div>
-  <button class="filter-btn" id="btn-negativo" disabled>Negativo</button>
-  <button class="filter-btn" id="btn-limiar" disabled>Limiarização</button>
-  <button class="filter-btn" disabled>Escala de cinza <span class="tag">em breve</span></button>
-  <button class="filter-btn" disabled>Desfoque <span class="tag">em breve</span></button>
-  <button class="filter-btn" disabled>Contraste <span class="tag">em breve</span></button>
+        <!------------------ Barra lateral esquerda ------------------>
+        <!------------- contém ferramentas que não utilizam filtros -->
 
-  <div class="section-gap"></div>
+        <aside class="sidebar" id="tools">
+                <div class="panel-title">FERRAMENTAS</div>
+                <div class="tool-item">Selecionar</div>
+                <div class="tool-item">Cortar</div>
+                <div class="tool-item">Desenhar</div>
+        </aside>
+        
 
-  <div class="panel-title">CAMADAS</div>
-  <div id="layers-list">
-    <div class="layers-empty">Nenhum filtro aplicado</div>
-  </div>
-</aside>
 
-<!-- Lógica do editor (abrir, aplicar filtros, camadas, salvar) -->
-<script src="script.js"></script>
-</body>
+        <!-- Barra lateral direita-->
+        <!-- contém as diversas opções de filtros e processamento de imagem-->
+
+        <aside class="sidebar" id="filters">
+            <div id="filters-items">
+                <div class="panel-title">FILTROS</div>
+                <button class="filter-btn" id="negative" disabled>Negativo</button>
+                <button class="filter-btn" id="threshold"disabled>Limiarização</button>
+                <button class="filter-btn" id="brightness" disabled>Brilho</button>
+                <button class="filter-btn" id="gama" disabled>Correção de gama<span class="tag">em breve</span></button>
+                <button class="filter-btn" id="linear-func" disabled>Linear<span class="tag">em breve</span></button>
+                <button class="filter-btn" id="esteganography" disabled>Esteganografia<span class="tag">em breve</span></button>
+            </div>
+            <div class="section-gap"></div>
+
+            <div class="panel-title">CAMADAS</div>
+            <div class="layers">
+                <div id="layers-list"></div>
+                <div class="layers-empty">Nenhum filtro aplicado</div>
+            </div>
+        </aside>
+
+
+
+        <!--------------------- Área da imagem ---------------------->
+
+        <section id="canvas-area">
+            <div id="empty-canvas">
+                Nenhuma imagem carregada
+            </div>
+
+            <div id="canvas">
+                <img id="main-img" alt="imagem">
+            </div>
+        </section>
+
+
+
+        <script src="script.js"></script>
+    </body>
 </html>
