@@ -12,6 +12,8 @@ const thresholdBtn = document.getElementById("threshold");
 const brightnessBtn = document.getElementById("brightness");
 const gammaBtn = document.getElementById("gama");
 const linearBtn = document.getElementById("linear-func");
+const histogramBtn = document.getElementById("histogram");
+const histogramEqBtn = document.getElementById("histogram-eq");
 const steganographyBtn = document.getElementById("esteganography");
 
 const layersList = document.getElementById("layers-list");
@@ -55,6 +57,8 @@ function setControlEnable(enabled) {
     brightnessBtn.disabled = !enabled;
     gammaBtn.disabled = !enabled;
     linearBtn.disabled = !enabled;
+    histogramBtn.disabled = !enabled;
+    histogramEqBtn.disabled = !enabled;
     steganographyBtn.disabled = !enabled;
 }
 
@@ -190,8 +194,12 @@ function applyFilter(jimpImg, layer) {
         applyPiecewiseLinear(jimpImg, layer);
     }
 
+    else if (layer.type === "histogram-eq") {
+        applyHistogramEqualization(jimpImg, layer);
+    }
+
     else if (layer.type === "steganography") {
-        applySteganography(jimpImg, layer);
+        hideMessage(jimpImg, layer);
     }
 
 
@@ -350,134 +358,243 @@ async function applyPiecewiseLinear(jimpImg, layer) {
 }
 
 
-
-
-// ================================================================================================================
-// Esteganografia
-// ================================================================================================================
-
-
-
-
 // ------------------------------
+// Histograma e equalização de histograma
 
 
-// cabeçalho de 32 bits (4 bytes) no início do fluxo de bits guarda o
-// comprimento da mensagem em bytes; cada canal de cor (R, G e B) esconde
-// 1 bit no bit menos significativo, ou seja, 3 bits por pixel
+// calcula os histogramas de R, G, B (256 posições cada, contagem de
+// pixels por nível de intensidade) e o histograma de luminância (média
+// dos três canais), usado como base tanto para a exibição quanto para
+// a equalização
 
-const STEGO_HEADER_BITS = 32;
-
-
-
-
-// quantos bits a imagem comporta (3 por pixel: R, G e B)
-
-function stegoCapacityBits(jimpImg) {
-    return jimpImg.bitmap.width * jimpImg.bitmap.height * 3;
-}
-
-
-
-
-// transforma a mensagem em bytes UTF-8 e calcula quantos bits ela
-// ocupará na imagem (cabeçalho + 8 bits por byte)
-
-function stegoMessageBits(message) {
-    const bytes = new TextEncoder().encode(message);
-    return { bytes, bits: STEGO_HEADER_BITS + bytes.length * 8 };
-}
-
-
-
-
-// esconde a mensagem nos bits menos significativos de R, G e B, na ordem
-// dos pixels; o cabeçalho guarda o comprimento e a mensagem o segue bit a
-// bit — a função supõe que a mensagem cabe (o controle de capacidade é
-// feito na janela do filtro)
-
-async function applySteganography(jimpImg, layer) {
-    const { bytes, bits } = stegoMessageBits(layer.message);
-    let bitIndex = 0;
-
-    // devolve o bit i do pacote: os 32 primeiros bits são o comprimento
-    // (big-endian) e os demais são os bytes da mensagem
-    function bitOf(i) {
-        if (i < STEGO_HEADER_BITS) {
-            return (bytes.length >>> (STEGO_HEADER_BITS - 1 - i)) & 1;
-        }
-        const rest = i - STEGO_HEADER_BITS;
-        return (bytes[rest >> 3] >>> (7 - (rest & 7))) & 1;
-    }
+function computeHistograms(jimpImg) {
+    const r = new Array(256).fill(0);
+    const g = new Array(256).fill(0);
+    const b = new Array(256).fill(0);
+    const luminance = new Array(256).fill(0);
 
     jimpImg.scan(0, 0, jimpImg.bitmap.width, jimpImg.bitmap.height, function(x, y, idx) {
-        for (let channel = 0; channel < 3; channel++) {
-            if (bitIndex >= bits) return false;
-            const value = this.bitmap.data[idx + channel];
-            this.bitmap.data[idx + channel] = (value & 0xFE) | bitOf(bitIndex);
-            bitIndex++;
-        }
+        const red = this.bitmap.data[idx + 0];
+        const green = this.bitmap.data[idx + 1];
+        const blue = this.bitmap.data[idx + 2];
+
+        r[red]++;
+        g[green]++;
+        b[blue]++;
+        luminance[Math.round((red + green + blue) / 3)]++;
     });
+
+    return { r, g, b, luminance };
+}
+
+
+
+
+// constrói a LUT de equalização a partir de um histograma: acumula as
+// contagens (CDF), normaliza para a faixa 0-255 e ignora o menor valor
+// de CDF (cdfMin) para que o nível mais escuro da imagem continue em 0,
+// como na equalização de histograma clássica
+
+function buildEqualizationLut(histogram, totalPixels) {
+    const lut = new Uint8ClampedArray(256);
+
+    if (totalPixels === 0) {
+        return lut;
+    }
+
+    const cdf = new Array(256).fill(0);
+    let cumulative = 0;
+    for (let i = 0; i < 256; i++) {
+        cumulative += histogram[i];
+        cdf[i] = cumulative;
+    }
+
+    // cdfMin é a menor contagem acumulada não-nula; se a imagem tiver
+    // um único nível de intensidade, cdfMin === totalPixels e a divisão
+    // abaixo daria zero no denominador, então esse caso é tratado à parte
+    const cdfMin = cdf.find((value) => value > 0) ?? 0;
+
+    if (cdfMin === totalPixels) {
+        // imagem com um só nível de tom: não há o que equalizar,
+        // mantém a identidade para não gerar ruído artificial
+        for (let i = 0; i < 256; i++) lut[i] = i;
+        return lut;
+    }
+
+    for (let i = 0; i < 256; i++) {
+        lut[i] = Math.round(((cdf[i] - cdfMin) / (totalPixels - cdfMin)) * 255);
+    }
+
+    return lut;
+}
+
+
+
+
+// aplica a equalização de histograma. modo "luminance" (padrão) equaliza
+// a média dos canais e aplica a mesma LUT aos três, preservando a matiz;
+// modo "channels" equaliza R, G e B de forma independente, o que corrige
+// mais contraste porém pode alterar as cores da imagem
+
+async function applyHistogramEqualization(jimpImg, layer) {
+    const mode = layer.mode || "luminance";
+    const totalPixels = jimpImg.bitmap.width * jimpImg.bitmap.height;
+    const { r, g, b, luminance } = computeHistograms(jimpImg);
+
+    if (mode === "channels") {
+        const lutR = buildEqualizationLut(r, totalPixels);
+        const lutG = buildEqualizationLut(g, totalPixels);
+        const lutB = buildEqualizationLut(b, totalPixels);
+
+        jimpImg.scan(0, 0, jimpImg.bitmap.width, jimpImg.bitmap.height, function(x, y, idx) {
+            this.bitmap.data[idx + 0] = lutR[this.bitmap.data[idx + 0]];
+            this.bitmap.data[idx + 1] = lutG[this.bitmap.data[idx + 1]];
+            this.bitmap.data[idx + 2] = lutB[this.bitmap.data[idx + 2]];
+        });
+    } else {
+        const lutLuminance = buildEqualizationLut(luminance, totalPixels);
+
+        jimpImg.scan(0, 0, jimpImg.bitmap.width, jimpImg.bitmap.height, function(x, y, idx) {
+            const red = this.bitmap.data[idx + 0];
+            const green = this.bitmap.data[idx + 1];
+            const blue = this.bitmap.data[idx + 2];
+            const level = Math.round((red + green + blue) / 3);
+            const equalized = lutLuminance[level];
+
+            // desloca cada canal pela mesma diferença aplicada à
+            // luminância, preservando a proporção de cor original
+            const delta = equalized - level;
+
+            this.bitmap.data[idx + 0] = clamp(red + delta, 0, 255);
+            this.bitmap.data[idx + 1] = clamp(green + delta, 0, 255);
+            this.bitmap.data[idx + 2] = clamp(blue + delta, 0, 255);
+        });
+    }
+
     return jimpImg;
 }
 
 
 
 
-// extrai a mensagem escondida lendo os bits menos significativos de R, G
-// e B; devolve null quando não há mensagem válida (cabeçalho ausente,
-// comprimento impossível para a imagem ou texto que não é UTF-8)
+// desenha um histograma (um único canal de contagens) num canvas 2D,
+// normalizando as barras pela maior contagem encontrada; usado tanto
+// para o histograma "cru" quanto para o histograma pós-equalização
 
-async function readSteganography(jimpImg) {
-    const capacity = stegoCapacityBits(jimpImg);
-    if (capacity < STEGO_HEADER_BITS) return null;
+function drawHistogramBars(canvasEl, histogram, color) {
+    const ctx = canvasEl.getContext("2d");
+    const width = canvasEl.width;
+    const height = canvasEl.height;
 
-    // coleta `total` bits da imagem, pulando os `skip` primeiros (o
-    // cabeçalho ocupa as primeiras 32 posições do fluxo)
-    function collectBits(total, skip = 0) {
-        const out = new Uint8Array(total);
-        let collected = 0;
+    ctx.clearRect(0, 0, width, height);
 
-        jimpImg.scan(0, 0, jimpImg.bitmap.width, jimpImg.bitmap.height, function(x, y, idx) {
-            for (let channel = 0; channel < 3; channel++) {
-                if (collected >= total) return false;
-                const bit = this.bitmap.data[idx + channel] & 1;
-                if (skip > 0) { skip--; continue; }
-                out[collected++] = bit;
-            }
-        });
-        return out;
-    }
+    const maxCount = Math.max(...histogram);
+    if (maxCount === 0) return;
 
-    // lê o comprimento do cabeçalho (32 bits, big-endian)
-    const header = collectBits(STEGO_HEADER_BITS);
-    let length = 0;
-    for (let i = 0; i < STEGO_HEADER_BITS; i++) {
-        length = length * 2 + header[i];
-    }
+    const barWidth = width / 256;
 
-    // comprimento impossível para esta imagem: não há mensagem
-    if (length <= 0 || STEGO_HEADER_BITS + length * 8 > capacity) {
-        return null;
-    }
-
-    // reagrupa os bits do corpo em bytes e decodifica como UTF-8
-    const body = collectBits(length * 8, STEGO_HEADER_BITS);
-    const bytes = new Uint8Array(length);
-    for (let b = 0; b < length; b++) {
-        let value = 0;
-        for (let k = 0; k < 8; k++) {
-            value = value * 2 + body[b * 8 + k];
-        }
-        bytes[b] = value;
-    }
-
-    try {
-        return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
-    } catch (err) {
-        return null;
+    ctx.fillStyle = color;
+    for (let i = 0; i < 256; i++) {
+        const barHeight = (histogram[i] / maxCount) * height;
+        ctx.fillRect(i * barWidth, height - barHeight, Math.max(barWidth, 1), barHeight);
     }
 }
+
+
+
+
+// ------------------------------
+// Função de esteganografia (ocultar/revelar texto)
+
+
+// converte um texto para uma sequência de bits (8 bits por caractere,
+// UTF-8), seguida de um terminador de 16 bits em zero, que marca o
+// fim da mensagem na hora de revelar
+
+function textToBits(text) {
+    const bytes = new TextEncoder().encode(text);
+    const bits = [];
+
+    bytes.forEach((byte) => {
+        for (let i = 7; i >= 0; i--) {
+            bits.push((byte >> i) & 1);
+        }
+    });
+
+    // terminador: 16 zeros seguidos, que não ocorrem no meio de um
+    // texto UTF-8 válido, pois todo byte de texto tem ao menos um bit 1
+    for (let i = 0; i < 16; i++) {
+        bits.push(0);
+    }
+
+    return bits;
+}
+
+
+
+
+// embute os bits de um texto no bit menos significativo do canal
+// azul de cada pixel, em ordem de varredura; a imagem precisa ter
+// pixels suficientes para conter a mensagem inteira
+
+async function hideMessage(jimpImg, layer) {
+    const bits = textToBits(layer.value);
+    const totalPixels = jimpImg.bitmap.width * jimpImg.bitmap.height;
+
+    if (bits.length > totalPixels) {
+        throw new Error("Mensagem longa demais para esta imagem.");
+    }
+
+    let bitIndex = 0;
+
+    jimpImg.scan(0, 0, jimpImg.bitmap.width, jimpImg.bitmap.height, function(x, y, idx) {
+        if (bitIndex >= bits.length) return;
+
+        const blue = this.bitmap.data[idx + 2];
+        this.bitmap.data[idx + 2] = (blue & 0xfe) | bits[bitIndex];
+        bitIndex++;
+    });
+
+    return jimpImg;
+}
+
+
+
+
+// lê o bit menos significativo do canal azul de cada pixel, em ordem
+// de varredura, até encontrar o terminador (16 zeros seguidos) ou
+// esgotar a imagem, e decodifica os bits lidos de volta para texto
+
+function revealMessage(jimpImg) {
+    const bits = [];
+    let zeroStreak = 0;
+
+    jimpImg.scan(0, 0, jimpImg.bitmap.width, jimpImg.bitmap.height, function(x, y, idx) {
+        if (zeroStreak >= 16) return;
+
+        const bit = this.bitmap.data[idx + 2] & 1;
+        bits.push(bit);
+        zeroStreak = bit === 0 ? zeroStreak + 1 : 0;
+    });
+
+    // remove o terminador de 16 zeros antes de decodificar
+    const messageBits = zeroStreak >= 16 ? bits.slice(0, bits.length - 16) : bits;
+
+    const byteCount = Math.floor(messageBits.length / 8);
+    const bytes = new Uint8Array(byteCount);
+
+    for (let i = 0; i < byteCount; i++) {
+        let byte = 0;
+        for (let b = 0; b < 8; b++) {
+            byte = (byte << 1) | messageBits[i * 8 + b];
+        }
+        bytes[i] = byte;
+    }
+
+    return new TextDecoder().decode(bytes);
+}
+
+
 
 
 // ================================================================================================================
@@ -547,6 +664,21 @@ saveBtn.addEventListener("click", async () => {
 
 
 
+// centraliza a janela na tela, usando suas dimensões reais (offsetWidth/
+// offsetHeight); precisa ser chamada com a janela já inserida no DOM, e
+// deve ser chamada de novo sempre que o tamanho da janela mudar (ex: ao
+// virar fw-wide), pois a centralização inicial fica desatualizada
+
+function centerWindow(win) {
+    const width = win.offsetWidth;
+    const height = win.offsetHeight;
+    win.style.left = `${Math.max(0, (window.innerWidth - width) / 2)}px`;
+    win.style.top = `${Math.max(0, (window.innerHeight - height) / 2)}px`;
+}
+
+
+
+
 // centraliza a janela na posição (x, y) do cursor
 
 function placeAtCursor(win, x, y) {
@@ -591,8 +723,6 @@ function enableDragging(win, head) {
 function createFilterWindow(title) {
     const win = document.createElement("div");
     win.className = "filter-window";
-    win.style.left = "50%";
-    win.style.top = "120px";
 
     win.innerHTML = `
         <div class="fw-head">
@@ -607,6 +737,7 @@ function createFilterWindow(title) {
     `;
 
     document.body.appendChild(win);
+    centerWindow(win);
 
     const head = win.querySelector(".fw-head");
     enableDragging(win, head);
@@ -690,6 +821,8 @@ function createFilterGraph(win, aboveGraphHtml = "", insideGraphHtml = "") {
 
     body.appendChild(mainColumn);
     body.appendChild(graphColumn);
+
+    centerWindow(win);
 
     const graphBox = graphColumn.querySelector(".fw-curve");
     const graphCanvas = graphColumn.querySelector("canvas");
@@ -1293,13 +1426,11 @@ linearBtn.addEventListener("click", () => {
             return;
         }
 
-        // clique em área vazia da curva: cria um novo ponto de controle;
-        // o x é limitado a [1, 254] para que o ponto criado nunca vire um
-        // extremo (extremos têm x travado e não podem ser removidos)
+        // clique em área vazia da curva: cria um novo ponto de controle
         const { x, y } = toImageXY(px, py);
-        const newPoint = { x: clamp(x, 1, 254), y };
+        const newPoint = { x, y };
         currentPoints().push(newPoint);
-        newPoint.x = clampPointX(newPoint, newPoint.x);
+        newPoint.x = clampPointX(newPoint, x);
         draggingPoint = newPoint;
         refresh();
     });
@@ -1367,6 +1498,164 @@ linearBtn.addEventListener("click", () => {
     });
 });
 
+
+
+
+// ================================================================================
+
+
+histogramBtn.addEventListener("click", () => {
+    const win = createFilterWindow("Histograma");
+
+    // esta janela é só de visualização: não mostra a imagem (ela já está
+    // visível na área de trabalho principal) nem gera camada nenhuma,
+    // então tanto a preview quanto o botão "Aplicar" (herdados do layout
+    // padrão) são removidos
+    win.querySelector(".fw-preview").remove();
+    win.querySelector(".fw-apply").remove();
+
+    const controls = win.querySelector(".fw-controls");
+    controls.innerHTML = `
+    <div class="fw-control">
+        <div class="fw-control-header">
+            <label>Canal</label>
+        </div>
+        <div class="fw-channel-tabs">
+            <button type="button" class="fw-channel-tab active" data-channel="luminance">Luminância</button>
+            <button type="button" class="fw-channel-tab" data-channel="r">R</button>
+            <button type="button" class="fw-channel-tab" data-channel="g">G</button>
+            <button type="button" class="fw-channel-tab" data-channel="b">B</button>
+        </div>
+    </div>
+    <div class="fw-histogram-canvas-wrap">
+        <canvas class="fw-histogram-canvas" width="400" height="160"></canvas>
+    </div>
+    `;
+
+    const channelTabs = [...controls.querySelectorAll(".fw-channel-tab")];
+    const histCanvas = controls.querySelector(".fw-histogram-canvas");
+
+    const CHANNEL_COLORS = { luminance: "#e0e0e0", r: "#e05a4a", g: "#4ac26a", b: "#4a8ce0" };
+
+    let activeChannel = "luminance";
+
+    // imagem com as camadas já aplicadas: o histograma exibido reflete
+    // o resultado atual, não a imagem original sem edições
+    const current = originalImg.clone();
+    layers.forEach((layer) => applyFilter(current, layer));
+    const histograms = computeHistograms(current);
+
+    function redrawHistogram() {
+        drawHistogramBars(histCanvas, histograms[activeChannel], CHANNEL_COLORS[activeChannel]);
+    }
+
+    channelTabs.forEach((tab) => {
+        tab.addEventListener("click", () => {
+            channelTabs.forEach((t) => t.classList.remove("active"));
+            tab.classList.add("active");
+            activeChannel = tab.dataset.channel;
+            redrawHistogram();
+        });
+    });
+
+    // a remoção da preview muda a altura da janela; recentraliza com
+    // o tamanho final já estabilizado
+    centerWindow(win);
+    redrawHistogram();
+});
+
+
+
+
+// ================================================================================
+
+
+histogramEqBtn.addEventListener("click", () => {
+    const win = createFilterWindow("Equalização de histograma");
+    win.classList.add("fw-wide");
+
+    // reorganiza o layout padrão (uma coluna) em duas colunas: dados de
+    // equalização (modo + histograma resultante) à esquerda, imagem à
+    // direita — mesmo esquema de fw-col-main / fw-col-curve usado no
+    // gráfico de tons, mas com a coluna direita mostrando a imagem
+    // em vez de uma curva
+    const body = win.querySelector(".fw-body");
+    body.classList.add("fw-body-split");
+
+    const preview = win.querySelector(".fw-preview");
+    const controls = win.querySelector(".fw-controls");
+    const applyBtn = win.querySelector(".fw-apply");
+
+    const dataColumn = document.createElement("div");
+    dataColumn.className = "fw-col-main";
+    dataColumn.appendChild(controls);
+    dataColumn.appendChild(applyBtn);
+
+    const imageColumn = document.createElement("div");
+    imageColumn.className = "fw-col-image";
+    imageColumn.appendChild(preview);
+
+    body.appendChild(dataColumn);
+    body.appendChild(imageColumn);
+
+    controls.innerHTML = `
+    <div class="fw-control">
+        <div class="fw-control-header">
+            <label>Modo</label>
+        </div>
+        <div class="fw-channel-tabs">
+            <button type="button" class="fw-channel-tab active" data-mode="luminance">Luminância</button>
+            <button type="button" class="fw-channel-tab" data-mode="channels">Canais (R, G, B)</button>
+        </div>
+    </div>
+    <div class="fw-histogram-canvas-wrap">
+        <canvas class="fw-histogram-canvas fw-histogram-canvas-compact" width="400" height="160"></canvas>
+    </div>
+    `;
+
+    const modeTabs = [...controls.querySelectorAll(".fw-channel-tab")];
+    const histCanvas = controls.querySelector(".fw-histogram-canvas");
+
+    let mode = "luminance";
+
+    function updateHistogramEqPreview() {
+        const previewImg = originalImg.clone();
+        layers.forEach((layer) => applyFilter(previewImg, layer));
+        applyFilter(previewImg, { type: "histogram-eq", mode });
+        showPreview(win, previewImg);
+
+        // recalcula o histograma sobre o resultado já equalizado, para
+        // mostrar o efeito da equalização (distribuição mais uniforme)
+        const { luminance } = computeHistograms(previewImg);
+        drawHistogramBars(histCanvas, luminance, "#e0e0e0");
+    }
+
+    modeTabs.forEach((tab) => {
+        tab.addEventListener("click", () => {
+            modeTabs.forEach((t) => t.classList.remove("active"));
+            tab.classList.add("active");
+            mode = tab.dataset.mode;
+            updateHistogramEqPreview();
+        });
+    });
+
+    // o layout de duas colunas muda as dimensões da janela (fw-wide);
+    // recentraliza com o tamanho final já estabilizado
+    centerWindow(win);
+    updateHistogramEqPreview();
+
+    applyBtn.addEventListener("click", () => {
+        const label = mode === "channels" ? "Equalização (canais)" : "Equalização (luminância)";
+        layers.push({ label, type: "histogram-eq", mode });
+        updateLayersPanel();
+        rebuildImageFromLayers();
+        win.remove();
+    });
+});
+
+
+
+
 // ================================================================================
 
 
@@ -1375,120 +1664,92 @@ steganographyBtn.addEventListener("click", () => {
     const controls = win.querySelector(".fw-controls");
 
     controls.innerHTML = `
-    <div class="fw-channel-tabs">
-        <button type="button" class="fw-channel-tab active" data-mode="write">Escrever</button>
-        <button type="button" class="fw-channel-tab" data-mode="read">Ler</button>
+    <div class="fw-control">
+        <div class="fw-control-header">
+            <label>Texto a ocultar</label>
+        </div>
+        <textarea class="fw-textarea" rows="4" placeholder="Digite a mensagem.."></textarea>
+        <div class="fw-stego-capacity"></div>
     </div>
-    <div class="fw-stego-write">
-        <textarea class="fw-textarea" rows="5" placeholder="Digite a mensagem para esconder na imagem"></textarea>
-        <div class="fw-capacity"></div>
-        <div class="fw-curve-hint">Aplique este filtro por último: filtros aplicados depois dele podem corromper a mensagem.</div>
-    </div>
-    <div class="fw-stego-read" style="display: none">
-        <button type="button" class="fw-read-btn">Ler mensagem</button>
-        <textarea class="fw-textarea" rows="5" readonly placeholder="A mensagem encontrada aparecerá aqui"></textarea>
-        <div class="fw-read-status"></div>
+    <div class="fw-control">
+        <button type="button" class="fw-reveal-btn">Revelar texto desta imagem</button>
+        <div class="fw-stego-revealed"></div>
     </div>
     `;
 
-    const tabs = [...controls.querySelectorAll(".fw-channel-tab")];
-    const writeSection = controls.querySelector(".fw-stego-write");
-    const readSection = controls.querySelector(".fw-stego-read");
-    const textarea = writeSection.querySelector("textarea");
-    const capacityInfo = controls.querySelector(".fw-capacity");
-    const readBtn = controls.querySelector(".fw-read-btn");
-    const readResult = readSection.querySelector("textarea");
-    const readStatus = controls.querySelector(".fw-read-status");
-    const applyBtn = win.querySelector(".fw-apply");
+    const textarea = controls.querySelector(".fw-textarea");
+    const capacityLabel = controls.querySelector(".fw-stego-capacity");
+    const revealBtn = controls.querySelector(".fw-reveal-btn");
+    const revealedBox = controls.querySelector(".fw-stego-revealed");
+
+    // capacidade máxima de bits é um por pixel; cada byte de texto usa 8
+    // bits mais 16 bits fixos do terminador; caracteres acentuados ou
+    // especiais podem ocupar mais de um byte em UTF-8
+    const maxBytes = Math.floor((originalImg.bitmap.width * originalImg.bitmap.height - 16) / 8);
+    capacityLabel.textContent = `Capacidade aproximada: ${maxBytes} caracteres (menos se houver acentos ou símbolos)`;
 
 
 
 
-    // gera o preview da imagem como ela está (original + camadas aplicadas)
-
-    function buildCurrentPreview() {
-        const preview = originalImg.clone();
-        layers.forEach((layer) => applyFilter(preview, layer));
-        return preview;
-    }
-
-
-
-
-    // transforma o tamanho da mensagem em bits, compara com o espaço
-    // disponível na imagem e atualiza o preview com a mensagem embutida
+    // mostra a imagem já com as camadas atuais aplicadas, sem nenhuma
+    // mudança nova; a esteganografia não tem efeito visível, então o
+    // preview serve só para confirmar que a imagem está correta
 
     function updateStegoPreview() {
-        const message = textarea.value;
-        const { bytes, bits } = stegoMessageBits(message);
-        const capacity = stegoCapacityBits(originalImg);
-        const maxBytes = Math.floor((capacity - STEGO_HEADER_BITS) / 8);
-        const fits = bits <= capacity;
-
-        capacityInfo.textContent = `Mensagem: ${bytes.length} bytes | Máximo para esta imagem: ${maxBytes} bytes`;
-        capacityInfo.classList.toggle("over", !fits);
-        applyBtn.disabled = !fits || message.length === 0;
-
-        const preview = buildCurrentPreview();
-        if (fits && message) {
-            applyFilter(preview, { type: "steganography", message });
-        }
+        const preview = originalImg.clone();
+        layers.forEach((layer) => applyFilter(preview, layer));
         showPreview(win, preview);
     }
 
-
-
-
-    // alterna entre escrever (cria uma camada) e ler (extrai da imagem
-    // atual, sem criar camada)
-
-    tabs.forEach((tab) => {
-        tab.addEventListener("click", () => {
-            tabs.forEach((t) => t.classList.remove("active"));
-            tab.classList.add("active");
-
-            const isWrite = tab.dataset.mode === "write";
-            writeSection.style.display = isWrite ? "" : "none";
-            readSection.style.display = isWrite ? "none" : "";
-            applyBtn.style.display = isWrite ? "" : "none";
-
-            if (isWrite) {
-                updateStegoPreview();
-            } else {
-                showPreview(win, buildCurrentPreview());
-            }
-        });
-    });
+    updateStegoPreview();
 
 
 
 
-    // extrai a mensagem da imagem exibida (original + camadas) e mostra
-    // o resultado; avisa quando não encontra nada válido
+    revealBtn.addEventListener("click", async () => {
+        revealedBox.textContent = "Lendo..";
 
-    readBtn.addEventListener("click", async () => {
-        const message = await readSteganography(buildCurrentPreview());
+        try {
+            const current = originalImg.clone();
+            layers.forEach((layer) => applyFilter(current, layer));
+            const message = revealMessage(current);
 
-        if (message === null) {
-            readResult.value = "";
-            readStatus.textContent = "Nenhuma mensagem válida encontrada nesta imagem.";
-        } else {
-            readResult.value = message;
-            readStatus.textContent = "Mensagem recuperada com sucesso.";
+            revealedBox.textContent = message
+                ? `Mensagem encontrada: "${message}"`
+                : "Nenhuma mensagem encontrada nesta imagem.";
+        } catch (err) {
+            console.error(err);
+            revealedBox.textContent = "Não foi possível ler uma mensagem desta imagem.";
         }
     });
 
+    win.querySelector(".fw-apply").addEventListener("click", async () => {
+        const text = textarea.value;
 
+        if (!text) {
+            alert("Digite um texto para ocultar.");
+            return;
+        }
 
+        const byteLength = new TextEncoder().encode(text).length;
+        if (byteLength > maxBytes) {
+            alert("Texto longo demais para esta imagem.");
+            return;
+        }
 
-    textarea.addEventListener("input", updateStegoPreview);
+        const newLayer = { label: "Esteganografia", type: "steganography", value: text };
 
-    updateStegoPreview();
+        try {
+            // valida a camada isoladamente antes de adicioná-la à lista,
+            // para não deixar uma camada inválida na interface em caso de erro
+            await applyFilter(originalImg.clone(), newLayer);
+        } catch (err) {
+            console.error(err);
+            alert(err.message);
+            return;
+        }
 
-    applyBtn.addEventListener("click", () => {
-        const message = textarea.value;
-        const { bytes } = stegoMessageBits(message);
-        layers.push({ label: `Esteganografia (${bytes.length} bytes)`, type: "steganography", message });
+        layers.push(newLayer);
         updateLayersPanel();
         rebuildImageFromLayers();
         win.remove();
